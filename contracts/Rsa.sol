@@ -2,7 +2,13 @@
 pragma solidity 0.8.17;
 
 contract Rsa {
-    event Metamorphosed(address metamorphicContract);
+
+    // no need to emit contract address as it will remain same
+    event Metamorphosed();
+
+    // custom errors save gas
+    error incorrectPublicKeyLength();   
+    error metamorphicContractDeploymentFailed();  
 
     address public immutable owner;
 
@@ -118,8 +124,12 @@ contract Rsa {
              * @dev Store in memory, length of BASE(signature), EXPONENT, MODULUS.
              */
             mstore(0x80, sig.length)
-            mstore(add(0x80, 0x20), 0x20)
-            mstore(add(0x80, 0x40), sig.length)
+
+            //0x80 + 0x20 = 0xa0
+            mstore(0xa0, 0x20)
+
+            //0x80 + 0x40 = 0xc0
+            mstore(0xc0, sig.length)
 
             // Store in memory, BASE(signature), EXPONENT, MODULUS(public key).
             calldatacopy(0xe0, sig.offset, sig.length)
@@ -192,11 +202,6 @@ contract Rsa {
         }
     }
 
-    modifier onlyOwner() {
-        require(owner == msg.sender);
-        _;
-    }
-
     /**
      * @notice 'deployPublicKey' is used in initializing the metamorphic contract that
      *          stores the RSA modulus, n (public key).
@@ -205,8 +210,13 @@ contract Rsa {
      *
      * https://github.com/RareSkills/RSA-presale-allowlist
      */
-    function deployPublicKey(bytes calldata publicKey) external onlyOwner {
-        require(publicKey.length == modLength, "incorrect publicKey length");
+    function deployPublicKey(bytes calldata publicKey) external {
+
+        //inline owner check for gas savings
+        require(owner == msg.sender);
+        if(publicKey.length != modLength){
+            revert incorrectPublicKeyLength();
+        }
 
         // contract runtime code length (without modulus) = 51 bytes (0x33)
         bytes memory contractCode = abi.encodePacked(
@@ -252,12 +262,12 @@ contract Rsa {
         }
 
         // Ensure metamorphic deployment to address as calculated in constructor.
-        require(
-            deployedMetamorphicContract == metamorphicContractAddress,
-            "Failed to deploy the new metamorphic contract."
-        );
 
-        emit Metamorphosed(deployedMetamorphicContract);
+        if (deployedMetamorphicContract != metamorphicContractAddress){
+            revert metamorphicContractDeploymentFailed();
+        }
+
+        emit Metamorphosed();
     }
 
     /**
@@ -268,9 +278,21 @@ contract Rsa {
      *
      * https://github.com/RareSkills/RSA-presale-allowlist
      */
-    function destroyContract() external onlyOwner {
-        (bool success, ) = metamorphicContractAddress.call("");
-        require(success);
+    function destroyContract() external {
+
+        //inline owner check for gas savings
+        require(owner == msg.sender);
+
+        // copying immutable variable to stack
+        address _metamorphicContractAddress = metamorphicContractAddress;
+
+        // gas savings
+        assembly{
+            let success:= call(gas(), _metamorphicContractAddress, 0, 0, 0, 0, 0)
+            if iszero(success){
+                revert(0,0)
+            }
+        }
     }
 
     /**
