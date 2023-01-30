@@ -115,11 +115,10 @@ contract Rsa {
         // Load immutable variable onto the stack.
         address _metamorphicContractAddress = metamorphicContractAddress;
 
-        // no need to update pointer as all memory written here can be overwriten with no consequence
         assembly {
             /**
-             * @dev No need to update free memory pointer as all memory written here
-             *      can be overwriten with no consequence.
+             * @dev Writing to memory from the 0x0 slot as control of the program never transfers to solidity
+             *      after this assembly block. Hence, its safe to do so.
              *
              * @dev Store in memory, length of BASE(signature), EXPONENT, MODULUS.
              */
@@ -146,8 +145,6 @@ contract Rsa {
              *      previously mentioned memory layout including the length and
              *      value of the sig, exponent and modulus.
              */
-            let callDataSize := add(0x80, mul(sig.length, 2))
-
             /**
              * @dev Call 0x05 precompile (modular exponentation) w/ the following
              *      args and revert on failure.
@@ -160,8 +157,11 @@ contract Rsa {
              *      pointer for where to copy return,
              *      size of return data
              */
+
+            // callDataSize = 0x80 + sig.length * 2
+
             if iszero(
-                staticcall(gas(), 0x05, 0x00, callDataSize, 0x00, sig.length)
+                staticcall(gas(), 0x05, 0x00, add(0x80, add(sig.length, sig.length)), 0x00, sig.length)
             ) {
                 revert(0, 0)
             }
