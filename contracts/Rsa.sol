@@ -22,7 +22,7 @@ contract Rsa {
 
     bytes32 public constant EXPONENT =
         0x0000000000000000000000000000000000000000000000000000000000000003;
-
+        
     /**
      * @dev See README.md for bytecode breakdown
      */
@@ -123,29 +123,23 @@ contract Rsa {
              *
              * @dev Store in memory, length of BASE(signature), EXPONENT, MODULUS.
              */
-            mstore(0x80, sig.length)
-
-            //0x80 + 0x20 = 0xa0
-            mstore(0xa0, 0x20)
-
-            //0x80 + 0x40 = 0xc0
-            mstore(0xc0, sig.length)
+            mstore(0x00, sig.length)
+            mstore(0x20, 0x20)
+            mstore(0x40, sig.length)
 
             // Store in memory, BASE(signature), EXPONENT, MODULUS(public key).
-            calldatacopy(0xe0, sig.offset, sig.length)
-            mstore(add(0xe0, sig.length), EXPONENT)
+            calldatacopy(0x60, sig.offset, sig.length)
+            mstore(add(0x60, sig.length), EXPONENT)
 
             /**
              * @dev Calculate where in memory to copy modulus to (modPos). This must
              *      be dynamically determined as various size of signature may be used.
              */
-            let modPos := add(0xe0, add(sig.length, 0x20))
-
             /**
              * @dev 0x33 is a precalulated value that is the offset of where the
              *      signature begins in the metamorphic bytecode.
              */
-            extcodecopy(_metamorphicContractAddress, modPos, 0x33, sig.length)
+            extcodecopy(_metamorphicContractAddress, add(0x80, sig.length), 0x33, sig.length)
 
             /**
              * @dev callDataSize must be dynamically calculated. It follows the
@@ -167,7 +161,7 @@ contract Rsa {
              *      size of return data
              */
             if iszero(
-                staticcall(gas(), 0x05, 0x80, callDataSize, 0x80, sig.length)
+                staticcall(gas(), 0x05, 0x00, callDataSize, 0x00, sig.length)
             ) {
                 revert(0, 0)
             }
@@ -177,10 +171,9 @@ contract Rsa {
              * @dev Check all leading 32-byte chunk to ensure values are zeroed out.
              *      If a valid sig then only the last 20 bytes will contains non-zero bits.
              */
-            let chunksToCheck := div(sig.length, 0x20)
-            for { let i := 1 } lt(i, chunksToCheck) { i := add(i, 1) }
+            for { let i := 0x40 } lt(i, sig.length) { i := add(i, 0x20) }
             {
-                if  mload(add(0x60, mul(i, 0x20)))
+                if  mload(sub(i, 0x40))
                 {
                     revert(0, 0)
                 }   
@@ -189,9 +182,8 @@ contract Rsa {
             /**
              * @dev Decoded signature will always be contained in last 32-bytes.
              *      If msg.sender == decoded signature then return true, else false.
-             */
-            let decodedSig := mload(add(0x60, sig.length))
-            if eq(caller(), decodedSig) {
+             */    
+            if eq(caller(), mload(sub(sig.length, 0x20))) {
                 // Return true
                 mstore(0x00, 0x01)
                 return(0x00, 0x20)
