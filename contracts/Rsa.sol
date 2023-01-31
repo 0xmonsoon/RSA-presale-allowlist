@@ -122,18 +122,16 @@ contract Rsa {
              *
              * @dev Store in memory, length of BASE(signature), EXPONENT, MODULUS.
              */
-            mstore(0x00, sig.length)
+            // using returndatasize() to push 0 onto the stack
+            mstore(returndatasize(), sig.length)
             mstore(0x20, 0x20)
             mstore(0x40, sig.length)
 
             // Store in memory, BASE(signature), EXPONENT, MODULUS(public key).
-            calldatacopy(0x60, sig.offset, sig.length)
+            // msize() = 0x60
+            calldatacopy(msize(), sig.offset, sig.length)
             mstore(add(0x60, sig.length), EXPONENT)
 
-            /**
-             * @dev Calculate where in memory to copy modulus to (modPos). This must
-             *      be dynamically determined as various size of signature may be used.
-             */
             /**
              * @dev 0x33 is a precalulated value that is the offset of where the
              *      signature begins in the metamorphic bytecode.
@@ -144,6 +142,9 @@ contract Rsa {
              * @dev callDataSize must be dynamically calculated. It follows the
              *      previously mentioned memory layout including the length and
              *      value of the sig, exponent and modulus.
+             * 
+             *      callDataSize = 0x80 + sig.length * 2
+             *      msize() = callDataSize
              */
             /**
              * @dev Call 0x05 precompile (modular exponentation) w/ the following
@@ -158,10 +159,9 @@ contract Rsa {
              *      size of return data
              */
 
-            // callDataSize = 0x80 + sig.length * 2
-
+            // using returndatasize() to push 0 onto the stack
             if iszero(
-                staticcall(gas(), 0x05, 0x00, add(0x80, add(sig.length, sig.length)), 0x00, sig.length)
+                staticcall(gas(), 0x05, 0x00, msize(), returndatasize(), sig.length)
             ) {
                 revert(0, 0)
             }
@@ -185,11 +185,13 @@ contract Rsa {
              */    
             if eq(caller(), mload(sub(sig.length, 0x20))) {
                 // Return true
-                mstore(0x00, 0x01)
+                // codesize() will be greater than zero here and will be evaluated as true
+                mstore(0x00, codesize())
                 return(0x00, 0x20)
             }
             // Else Return false
-            mstore(0x00, 0x00)
+            // mstore(0x00, 0x00)
+            // no need to do mstore 0 in 0x0 slot as the slot already contains 0.
             return(0x00, 0x20)
         }
     }
