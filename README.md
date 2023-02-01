@@ -1,3 +1,6 @@
+# Detailed Article on Gas Optimisations in this codebase
+https://mirror.xyz/0xCdC75C7d65d5c4cD0329DA74f979C6E1613d57A5/0ZsbpDeEzQhqFNRnsJhhkmPg1oXJCxH0SMkr5EZbaNc
+
 # RSA-presale-allowlist
 This is a [RareSkills.io](https://RareSkills.io) project from the [Solidity Bootcamp](https://www.rareskills.io/web3-blockchain-bootcamps-solidity) to allowlist addresses far more efficiently than ECDSA or Merkle Trees.
 
